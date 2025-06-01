@@ -1,24 +1,79 @@
-# rag_pipeline.py
 import os
-from langchain_openai import OpenAIEmbeddings
 from langchain.vectorstores import FAISS
+from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.document_loaders import PyPDFLoader
-from langchain.chains import RetrievalQA
+from langchain.chains import ConversationalRetrievalChain
 from langchain.chat_models import ChatOpenAI
+from langchain.prompts import PromptTemplate
+from langchain.memory import ConversationBufferMemory
 
-def load_pdf_to_vectorstore(pdf_path="DOCS/scraped_data.pdf"):
+# Constants
+PDF_PATH = "DOCS/scraped_data.pdf"
+VECTORSTORE_DIR = "faiss_index"
+
+DEFAULT_SYSTEM_PROMPT = (
+    "You are a helpful and knowledgeable AI assistant."
+
+    "Use ONLY the information provided in the `context` below to answer the user's current question. "
+    "Make sure that should also consider the `chat history` to understand follow-up or related questions.\n\n"
+
+    "If the user asks for a summary, brief, or overview, and the context contains enough information, provide a concise summary based only on the context.\n"
+
+    "If the answer is NOT explicitly found in the context, reply:\n"
+    "'I'm sorry, the information you're looking for is not available in the provided documents.'\n\n"
+
+    "Do NOT use any external or general knowledge, and avoid making assumptions.\n"
+    "Always be concise, clear, and strictly refer to the content in the context provided."
+)
+
+
+def load_pdf_to_vectorstore(pdf_path=PDF_PATH, persist_dir=VECTORSTORE_DIR):
+    if os.path.exists(persist_dir) and os.path.isdir(persist_dir):
+        print("🔄 Loading FAISS index from disk...")
+        embeddings = OpenAIEmbeddings()
+        return FAISS.load_local(persist_dir, embeddings, allow_dangerous_deserialization=True)
+
+    print("📄 Loading and indexing PDF...")
     loader = PyPDFLoader(pdf_path)
     docs = loader.load()
+
     splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
     chunks = splitter.split_documents(docs)
 
     embeddings = OpenAIEmbeddings()
     vectorstore = FAISS.from_documents(chunks, embeddings)
+
+    vectorstore.save_local(persist_dir)
+    print(f"✅ FAISS index saved to {persist_dir}")
     return vectorstore
 
 def get_rag_chain(vectorstore):
     retriever = vectorstore.as_retriever()
     llm = ChatOpenAI(temperature=0, model_name="gpt-3.5-turbo")
-    rag_chain = RetrievalQA.from_chain_type(llm, retriever=retriever)
+
+    memory = ConversationBufferMemory(
+        memory_key="chat_history",
+        return_messages=True
+    )
+
+    prompt_template = PromptTemplate(
+        input_variables=["context", "question", "chat_history"],
+        template=(
+            f"{DEFAULT_SYSTEM_PROMPT}\n\n"
+            "Chat History:\n{chat_history}\n\n"
+            "Context:\n{context}\n\n"
+            "Question:\n{question}\n\n"
+            "Answer:"
+        )
+    )
+
+    rag_chain = ConversationalRetrievalChain.from_llm(
+        llm=llm,
+        retriever=retriever,
+        memory=memory,
+        combine_docs_chain_kwargs={"prompt": prompt_template},
+        return_source_documents=False
+    )
+
     return rag_chain
