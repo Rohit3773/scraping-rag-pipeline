@@ -18,15 +18,16 @@ An AI-powered assistant that combines Wikipedia-based knowledge with RAG (Retrie
 
 ### Step 1: API Configuration  
 Enter your OpenAI API key in the sidebar to activate the assistant.  
-📸 *Screenshot: `screenshot_api_key.png`*
+![API Key Input](./screenshots/screenshot_api_key.png)
+
 
 ### Step 2: Generate Knowledge Base PDF  
-Choose one or more Wikipedia topics from the dropdown and click "Generate PDF".  
-📸 *Screenshot: `screenshot_generate_pdf.png`*
+Choose one or more Wikipedia topics from the dropdown and click "Generate PDF".
+![Generate PDF](./screenshots/screenshot_generate_pdf.png)
 
 ### Step 3: Ask Questions (with Memory)  
 Start asking questions based on the generated knowledge base. The assistant retains the conversation history to enable contextual understanding.  
-📸 *Screenshot: `screenshot_chat_memory.png`*
+![Conversation History](./screenshots/screenshot_chat_memory.png)
 
 ---
 
