@@ -30,6 +30,7 @@ with st.expander("📘 Wikipedia sources used"):
     - [Large Language Models (LLMs)](https://en.wikipedia.org/wiki/Large_language_model)  
     """)
 
+pdf_generated = False
 if st.button("📝 Generate PDF"):
     if not openai_key:
         st.error("❌ OpenAI API key is required to proceed.")
@@ -37,27 +38,32 @@ if st.button("📝 Generate PDF"):
         scraper = WikipediaScraperPDFGenerator()
         pdf_path = scraper.run()
         st.success("✅ Wikipedia content saved to PDF.")
+        pdf_generated = True
         with open(pdf_path, "rb") as f:
             st.download_button(label="📥 Download PDF", data=f, file_name="scraped_data.pdf")
 
 st.divider()
 
-# --- Step 2: Setup Session State for Chain and History ---
-if "rag_chain" not in st.session_state:
-    if openai_key:
+# --- Step 2: Load Vectorstore and Setup Chain ---
+pdf_path = "DOCS/scraped_data.pdf"
+if "rag_chain" not in st.session_state and openai_key:
+    if os.path.exists(pdf_path):
         with st.spinner("🧠 Loading vectorstore and initializing assistant..."):
-            vectorstore = load_pdf_to_vectorstore()
+            vectorstore = load_pdf_to_vectorstore(pdf_path)
             st.session_state.rag_chain = get_rag_chain(vectorstore)
-            st.session_state.chat_history = []  # Used for visual display (optional)
+            st.session_state.chat_history = []
+    else:
+        st.warning("📄 Please generate the knowledge base PDF first before asking questions.", icon="⚠️")
 
-# --- Step 3: Query Input ---
+# --- Step 3: Ask Questions ---
 st.markdown("### 🔎 Step 2: Ask Questions (with Memory)")
-
 query = st.text_input("💬 Ask your question:", placeholder="e.g. What is AGI?")
 
 if query:
     if not openai_key:
         st.error("❌ API key required.")
+    elif "rag_chain" not in st.session_state:
+        st.warning("📄 Please generate the PDF before asking questions.", icon="⚠️")
     else:
         with st.spinner("🧠 Thinking..."):
             try:
