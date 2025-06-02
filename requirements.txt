@@ -6,3 +6,4 @@ openai
 faiss-cpu
 PyPDF2
 streamlit
+bs4
