@@ -2,6 +2,7 @@ import streamlit as st
 import os
 from scraper_and_pdf_generator import WikipediaScraperPDFGenerator
 from rag_pipeline import load_pdf_to_vectorstore, get_rag_chain
+from langchain.memory import ConversationBufferMemory
 
 # --- Page Setup ---
 st.set_page_config(page_title="Gen AI RAG Assistant", layout="centered")
@@ -46,14 +47,17 @@ st.divider()
 
 # --- Step 2: Load Vectorstore and Setup Chain ---
 pdf_path = "DOCS/scraped_data.pdf"
-if "rag_chain" not in st.session_state and openai_key:
-    if os.path.exists(pdf_path):
+if openai_key and os.path.exists(pdf_path):
+    if "rag_chain" not in st.session_state:
         with st.spinner("🧠 Loading vectorstore and initializing assistant..."):
             vectorstore = load_pdf_to_vectorstore(pdf_path)
-            st.session_state.rag_chain = get_rag_chain(vectorstore)
+
+            # Create memory once and store in session
+            memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+            st.session_state.memory = memory
+
+            st.session_state.rag_chain = get_rag_chain(vectorstore, memory)
             st.session_state.chat_history = []
-    else:
-        st.warning("📄 Please generate the knowledge base PDF first before asking questions.", icon="⚠️")
 
 # --- Step 3: Ask Questions ---
 st.markdown("### 🔎 Step 2: Ask Questions (with Memory)")
@@ -67,7 +71,7 @@ if query:
     else:
         with st.spinner("🧠 Thinking..."):
             try:
-                result = st.session_state.rag_chain.run(query)
+                result = st.session_state.rag_chain.run({"question": query})
                 st.session_state.chat_history.append(("You", query))
                 st.session_state.chat_history.append(("Assistant", result))
                 st.success("✅ Answer generated")
